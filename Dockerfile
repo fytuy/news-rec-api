@@ -1,29 +1,27 @@
-# ---- build stage ----
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+# Stage 1: Build
+FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /src
 
-# 复制全部源码
-COPY . .
+# 复制 csproj 并 restore
+COPY *.csproj ./ 
+RUN dotnet restore "NewsRecommendation.Api.csproj"
 
-# 还原并发布指定项目
-RUN set -eux; \
-    proj="./NewsRecommendation.Api.csproj"; \
-    if [ ! -f "$proj" ]; then \
-      proj=$(find . -name 'NewsRecommendation.Api.csproj' -print -quit); \
-    fi; \
-    echo "Using project: $proj"; \
-    dotnet restore "$proj"; \
-    dotnet publish "$proj" -c Release -o /app/out
+# 复制其余文件并 publish
+COPY . ./
+RUN dotnet publish "NewsRecommendation.Api.csproj" -c Release -o /app/out
 
-# ---- runtime stage ----
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+# Stage 2: Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:7.0 AS runtime
 WORKDIR /app
-
-# 把发布产物复制到运行时镜像
 COPY --from=build /app/out ./
 
-# Render 会提供 PORT；暴露端口仅为声明性
-EXPOSE 80
+# 如果有模型文件，需要也COPY过去
+COPY Models ./Models
 
-# 直接在 /app 目录运行 dll（dll 名称 = csproj 文件名）
+# 设置端口
+ENV DOTNET_RUNNING_IN_CONTAINER=true
+ENV DOTNET_USE_POLLING_FILE_WATCHER=1
+ENV DOTNET_ENABLE_PREVIEW_FEATURES=1
+
+EXPOSE 8080
 ENTRYPOINT ["dotnet", "NewsRecommendation.Api.dll"]
