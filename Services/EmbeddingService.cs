@@ -12,6 +12,7 @@ public class EmbeddingService
 
     public EmbeddingService()
     {
+        // 异步加载模型，避免启动时阻塞
         Task.Run(() => LoadModelAsync());
     }
 
@@ -56,7 +57,9 @@ public class EmbeddingService
         using var results = _session.Run(inputs);
         var output = results.First().AsTensor<float>();
 
-        var embedding = new float[output.Dimensions.Last()]; // 自动根据模型输出维度
+        // 修复 .Last() 错误，直接取 Dimensions 最后一个元素
+        var embedding = new float[output.Dimensions[output.Dimensions.Length - 1]];
+
         for (int i = 0; i < embedding.Length; i++)
             embedding[i] = output[0, 0, i];
 
