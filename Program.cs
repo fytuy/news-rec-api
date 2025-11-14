@@ -1,15 +1,15 @@
 // Program.cs
-using NewsRecommendation.Api.Services; // ±ØĞëÕâÑùĞ´£¡
+using NewsRecommendation.Api.Services; // å¿…é¡»è¿™æ ·å†™ï¼
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Ìí¼Ó·şÎñ
+// æ·»åŠ æœåŠ¡
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
-builder.Services.AddHostedService<ModelDownloadService>(); // ÏÖÔÚÄÜÕÒµ½£¡
+builder.Services.AddHostedService<ModelDownloadService>(); // ç°åœ¨èƒ½æ‰¾åˆ°ï¼
 builder.Services.AddSingleton<EmbeddingService>();
 
-// ¿ªÆô CORS£¨Ç°¶Ëµ÷ÓÃ£©
+// å¼€å¯ CORSï¼ˆå‰ç«¯è°ƒç”¨ï¼‰
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("all", policy =>
@@ -22,9 +22,22 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-app.UseHttpsRedirection();
+// ------------- IMPORTANT: bind to PORT for container platforms -------------
+// Read PORT env var (Render/Heroku/other container platforms set this)
+// and bind to 0.0.0.0 so external traffic can reach the container.
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+app.Urls.Add($"http://0.0.0.0:{port}");
+// ---------------------------------------------------------------------------
+
+// Optional: if HTTPS redirection causes problems in container, comment it out.
+// app.UseHttpsRedirection();
+
 app.UseCors("all");
 app.UseAuthorization();
 app.MapControllers();
 
+// minimal health endpoint for quick check
+app.MapGet("/", () => Results.Text("OK - news-rec-api is running"));
+
+// start app
 app.Run();
