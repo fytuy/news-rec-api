@@ -12,7 +12,6 @@ public class EmbeddingService
 
     public EmbeddingService()
     {
-        // 异步加载模型，避免启动时阻塞
         Task.Run(() => LoadModelAsync());
     }
 
@@ -27,6 +26,7 @@ public class EmbeddingService
             if (!File.Exists(vocabPath)) throw new FileNotFoundException($"词汇表未找到: {vocabPath}");
 
             _session = new InferenceSession(modelPath);
+
             _vocab = File.ReadLines(vocabPath)
                 .Select((line, i) => new { Word = line.Trim(), Id = i })
                 .ToDictionary(x => x.Word, x => x.Id);
@@ -48,18 +48,23 @@ public class EmbeddingService
         var tokens = text.ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var ids = tokens.Select(t => (long)_vocab.GetValueOrDefault(t, 0)).ToArray();
 
-        var tensor = new DenseTensor<long>(ids, new[] { 1, ids.Length });
+        int length = ids.Length;
+
+        var inputIds = new DenseTensor<long>(ids, new[] { 1, length });
+        var attentionMask = new DenseTensor<long>(Enumerable.Repeat(1L, length).ToArray(), new[] { 1, length });
+        var tokenTypeIds = new DenseTensor<long>(Enumerable.Repeat(0L, length).ToArray(), new[] { 1, length });
+
         var inputs = new List<NamedOnnxValue>
         {
-            NamedOnnxValue.CreateFromTensor("input_ids", tensor)
+            NamedOnnxValue.CreateFromTensor("input_ids", inputIds),
+            NamedOnnxValue.CreateFromTensor("attention_mask", attentionMask),
+            NamedOnnxValue.CreateFromTensor("token_type_ids", tokenTypeIds)
         };
 
         using var results = _session.Run(inputs);
         var output = results.First().AsTensor<float>();
 
-        // 修复 .Last() 错误，直接取 Dimensions 最后一个元素
         var embedding = new float[output.Dimensions[output.Dimensions.Length - 1]];
-
         for (int i = 0; i < embedding.Length; i++)
             embedding[i] = output[0, 0, i];
 

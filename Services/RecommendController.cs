@@ -40,7 +40,6 @@ public class RecommendController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            // 模型未加载或其他可控异常
             return Ok(new
             {
                 message = ex.Message,
@@ -50,7 +49,6 @@ public class RecommendController : ControllerBase
         }
         catch (Exception ex)
         {
-            // 其它异常返回 500
             return StatusCode(500, new
             {
                 message = "内部服务器错误",
