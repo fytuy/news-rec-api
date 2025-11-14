@@ -3,13 +3,13 @@ using NewsRecommendation.Api.Services; // 必须这样写！
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 添加服务
+// ------------------- 添加服务 -------------------
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
-builder.Services.AddHostedService<ModelDownloadService>(); // 现在能找到！
+builder.Services.AddHostedService<ModelDownloadService>();
 builder.Services.AddSingleton<EmbeddingService>();
 
-// 开启 CORS（前端调用）
+// 开启 CORS（允许任意来源访问 API）
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("all", policy =>
@@ -19,25 +19,31 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader();
     });
 });
+// -------------------------------------------------
 
 var app = builder.Build();
 
-// ------------- IMPORTANT: bind to PORT for container platforms -------------
-// Read PORT env var (Render/Heroku/other container platforms set this)
-// and bind to 0.0.0.0 so external traffic can reach the container.
+// ------------------- 配置请求管道 -------------------
+// Render / 容器平台需要绑定端口
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 app.Urls.Add($"http://0.0.0.0:{port}");
-// ---------------------------------------------------------------------------
 
-// Optional: if HTTPS redirection causes problems in container, comment it out.
+// 可选：如果 HTTPS 重定向导致容器访问失败，可以注释掉
 // app.UseHttpsRedirection();
 
+// ⚠️ Routing 必须在 UseCors 前
+app.UseRouting();
+
+// ⚠️ UseCors 必须在 MapControllers 之前
 app.UseCors("all");
+
 app.UseAuthorization();
+
+// 映射控制器
 app.MapControllers();
 
-// minimal health endpoint for quick check
+// 健康检查接口
 app.MapGet("/", () => Results.Text("OK - news-rec-api is running"));
 
-// start app
+// 启动应用
 app.Run();
